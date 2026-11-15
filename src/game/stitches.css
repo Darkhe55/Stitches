@@ -1,0 +1,47 @@
+/**
+ * 缝线 —— 样式
+ */
+
+.board-svg .st-board-bg {
+  fill: #fffdf8;
+  stroke: #2b3a3f;
+  stroke-width: 1.4;
+}
+
+.board-svg .st-cell {
+  stroke: #d8cfba;
+  stroke-width: 0.6;
+}
+
+.board-svg .st-region {
+  stroke: #4a3f32;
+  stroke-width: 2.2;
+  pointer-events: none;
+}
+
+.board-svg .st-stitch {
+  stroke: #b3541e;
+  stroke-width: 4;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.board-svg .st-count {
+  fill: #263338;
+  font-family: var(--mono);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.board-svg .st-count.bad {
+  fill: var(--error);
+}
+
+.board-svg .st-error {
+  fill: none;
+  stroke: var(--error);
+  stroke-width: 2;
+  pointer-events: none;
+}
