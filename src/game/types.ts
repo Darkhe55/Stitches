@@ -1,9 +1,10 @@
 /**
- * 缝线（Stitches 1÷）—— 类型
+ * 缝线（Stitches K÷）—— 类型
  *
  * regions[i]：区块编号。
  * edges[e]：相邻格之间的边，1 表示缝线。
  * rowCounts / colCounts：盘外行列针孔数。
+ * stitchPerPair：变体参数 K —— 每对相邻区块之间恰好 K 条缝线（缺省 1，即经典 1÷）。
  */
 
 import type { GameState, Puzzle, ValidationResult } from '../core/types'
@@ -12,7 +13,15 @@ export interface StitchesPuzzle extends Puzzle {
   regions: number[]
   rowCounts: number[]
   colCounts: number[]
+  /** 每对相邻区块需要的缝线数 K（1 = 经典 1÷，3 = 3÷ 变体）；缺省 1 */
+  stitchPerPair?: number
   solutionEdges?: string
+}
+
+/** 读取变体参数 K，容错为 1..9 的整数，缺省 1 */
+export function stitchPerPairOf(p: { stitchPerPair?: number }): number {
+  const k = Math.floor(Number(p.stitchPerPair ?? 1))
+  return Number.isFinite(k) && k >= 1 ? Math.min(k, 9) : 1
 }
 
 export interface StitchesState extends GameState {
@@ -32,8 +41,12 @@ export interface StitchesResult extends ValidationResult {
   colActual: number[]
   rowBad: number[]
   colBad: number[]
+  /** 缝线数少于 K 的相邻区块对 */
   pairMissing: string[]
+  /** 缝线数多于 K 的相邻区块对 */
   pairDuplicated: string[]
+  /** 本题的变体参数 K */
+  stitchPerPair: number
 }
 
 export function asStitchesPuzzle(p: Puzzle): StitchesPuzzle {
@@ -102,15 +115,46 @@ export function decodeRegions(text: string, expected: number): number[] | null {
   return out
 }
 
+/**
+ * 行列数字编码。
+ *
+ * 兼容两种格式：
+ * - 旧格式：每个数字一位（0..9），如 "5665563"；
+ * - 新格式：逗号分隔的整数，如 "3,9,7,10,..."（出现两位数的盘外数字时使用）。
+ */
 export function encodeCounts(counts: ArrayLike<number>): string {
-  let out = ''
-  for (let i = 0; i < counts.length; i++) out += String(Math.max(0, Math.min(9, counts[i]! | 0)))
-  return out
+  let single = true
+  for (let i = 0; i < counts.length; i++) {
+    const v = Math.max(0, Math.min(99, counts[i]! | 0))
+    if (v > 9) {
+      single = false
+      break
+    }
+  }
+  if (single) {
+    let out = ''
+    for (let i = 0; i < counts.length; i++) out += String(Math.max(0, Math.min(9, counts[i]! | 0)))
+    return out
+  }
+  const parts: string[] = []
+  for (let i = 0; i < counts.length; i++) parts.push(String(Math.max(0, Math.min(99, counts[i]! | 0))))
+  return parts.join(',')
 }
 
 export function decodeCounts(text: string, expected: number): number[] | null {
-  if (typeof text !== 'string' || text.length !== expected) return null
+  if (typeof text !== 'string') return null
   const out = new Array<number>(expected).fill(0)
+  if (text.includes(',')) {
+    const parts = text.split(',')
+    if (parts.length !== expected) return null
+    for (let i = 0; i < expected; i++) {
+      const raw = parts[i]!.trim()
+      if (!/^\d{1,2}$/.test(raw)) return null
+      out[i] = Number(raw)
+    }
+    return out
+  }
+  if (text.length !== expected) return null
   for (let i = 0; i < expected; i++) {
     const v = text.charCodeAt(i) - 48
     if (v < 0 || v > 9) return null

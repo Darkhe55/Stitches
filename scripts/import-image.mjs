@@ -13,9 +13,8 @@
  *      再按粗边界四连通洪泛出区域矩阵；
  *   4. 棋盘上方/左侧的行列数字：连通域切字 → 归一化 → 与内置粗体数字模板做 IoU，
  *      自动识别 0..9 并拼接多位数（识别簇可用 --map 人工覆盖）；
- *   5. 统计相邻区域对数与针孔总数，自动判断 1÷ / N÷ 变体；
- *      当前游戏只实现 1÷（每对相邻区域恰好 1 条缝线），N÷ 题图会明确报错；
- *   6. --verify 求解并校验唯一解（超时只警告）；预览；--append 写入题库。
+ *   5. 统计相邻区域对数与针孔总数，推算变体「每对相邻区域需要 K 条缝线」（1÷ / 3÷ …）；
+ *   6. --verify 求解并校验唯一解（超时只警告）；预览；--append 写入题库（含 k 字段）。
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
@@ -39,13 +38,13 @@ function findEdge() {
 function usage(msg) {
   console.error(`[缝线识图] ${msg}`)
   console.error(
-    '用法：node scripts/import-image.mjs <图片路径> [--name 名称] [--id ID] [--series 系列] [--append] [--verify] [--dry] [--map 簇号=数字] [--budget 节点数]',
+    '用法：node scripts/import-image.mjs <图片路径> [--name 名称] [--id ID] [--series 系列] [--append] [--verify] [--dry] [--k 变体K] [--map 簇号=数字] [--budget 节点数]',
   )
   process.exit(1)
 }
 
 function parseArgs(argv) {
-  const out = { file: null, name: null, id: null, series: '识图', append: false, verify: false, dry: false, maps: {}, budget: 0 }
+  const out = { file: null, name: null, id: null, series: '识图', append: false, verify: false, dry: false, maps: {}, budget: 0, k: 0 }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     const next = () => {
@@ -60,7 +59,11 @@ function parseArgs(argv) {
     else if (a === '--verify') out.verify = true
     else if (a === '--dry') out.dry = true
     else if (a === '--budget') out.budget = Math.max(1000, Number(next()) || 0)
-    else if (a === '--map') {
+    else if (a === '--k') {
+      const v = Number(next())
+      if (!Number.isInteger(v) || v < 1 || v > 9) usage('--k 应为 1..9 的整数')
+      out.k = v
+    } else if (a === '--map') {
       for (const token of next().split(',')) {
         const m = /^(\d+)=(\d)$/.exec(token.trim())
         if (!m) usage(`--map 格式应为 簇号=数字，收到「${token}」`)
@@ -360,16 +363,6 @@ if (process.env.IMPORT_DEBUG) {
 
 /* ───────── 变体判定与预览 ───────── */
 const regions = detected.regions
-const puzzle = {
-  id: 'preview',
-  name: 'preview',
-  width: w,
-  height: h,
-  difficulty: 'hard',
-  regions: regions.slice(),
-  rowCounts,
-  colCounts,
-}
 const pairSet = new Set()
 for (const e of buildEdges(regions, w, h)) {
   if (!e.candidate) continue
@@ -387,13 +380,26 @@ console.log(
     `推算每对需缝 ${variantK.toFixed(2)} 条线`,
 )
 if (sumRows !== sumCols) console.warn('[缝线识图] 警告：行/列数字总和不等，OCR 可能有误')
-if (Math.abs(variantK - 1) > 0.01) {
+const k = args.k || Math.round(variantK)
+if (!args.k && (!(k >= 1 && k <= 9) || Math.abs(variantK - k) > 0.01)) {
   console.error(
-    `[缝线识图] 这是 ${variantK.toFixed(0)}÷ 变体题图（每对相邻区域需要 ${variantK.toFixed(0)} 条线）。` +
-      '当前游戏的规则/求解器只实现 1÷ 变体，无法把这张图导入成可解题目。',
+    `[缝线识图] 无法判定变体：每对相邻区域需要 ${variantK.toFixed(2)} 条线（应为 1..9 的整数）。` +
+      '多为 OCR 数字识别错误；请用 --map 修正数字簇，或用 --k 显式指定变体后重跑。',
   )
-  console.error('[缝线识图] 如果是 OCR 数字识别错误导致，请用 --map 修正数字簇后重跑。')
   process.exit(2)
+}
+console.log(`[缝线识图] 变体：${k}÷（每对相邻区域恰好 ${k} 条缝线${args.k ? '，由 --k 指定' : ''}）`)
+
+const puzzle = {
+  id: 'preview',
+  name: 'preview',
+  width: w,
+  height: h,
+  difficulty: 'hard',
+  regions: regions.slice(),
+  rowCounts,
+  colCounts,
+  stitchPerPair: k,
 }
 
 console.log('[缝线识图] 区域矩阵：')
@@ -432,9 +438,9 @@ if (!args.append) {
 /* ───────── 写入题库 ───────── */
 const board = `${encodeRegions(regions)}|${encodeCounts(rowCounts)}|${encodeCounts(colCounts)}`
 const id = args.id || `stitches-import-${Date.now().toString(36)}`
-const name = args.name || `识图 · ${w}×${h}`
+const name = args.name || `识图 · ${w}×${h}${k > 1 ? ` · ${k}÷` : ''}`
 const solField = solution ? `, solution: ${JSON.stringify(solution)}` : ''
-const entry = `  { id: ${JSON.stringify(id)}, name: ${JSON.stringify(name)}, width: ${w}, height: ${h}, difficulty: 'hard', series: ${JSON.stringify(args.series)}, board: ${JSON.stringify(board)}${solField} },\n`
+const entry = `  { id: ${JSON.stringify(id)}, name: ${JSON.stringify(name)}, width: ${w}, height: ${h}, difficulty: 'hard', series: ${JSON.stringify(args.series)}, k: ${k}, board: ${JSON.stringify(board)}${solField} },\n`
 const dataFile = path.resolve('src/game/puzzles-data.ts')
 if (!existsSync(dataFile)) usage(`找不到题库文件：${dataFile}`)
 if (process.env.IMPORT_DEBUG) writeFileSync(path.resolve('scripts/.import-debug.json'), JSON.stringify({ w, h, regions, rowCounts, colCounts }))
@@ -444,6 +450,6 @@ if (marker < 0) usage('puzzles-data.ts 格式异常：找不到结尾 ]')
 text = text.slice(0, marker + 1) + '\n' + entry + text.slice(marker + 1)
 writeFileSync(dataFile, text)
 console.log(`[缝线识图] 已写入 ${dataFile}`)
-console.log(`[缝线识图] id=${id}  name=${name}（缝线 ${edgeCount(w, h)} 条边中取部分）`)
+console.log(`[缝线识图] id=${id}  name=${name}  K=${k}（缝线 ${edgeCount(w, h)} 条边中取 ${totalStitches} 条）`)
 console.log('[缝线识图] 注意：npm run gen 会重新生成该文件并覆盖导入内容。')
 

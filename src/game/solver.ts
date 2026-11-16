@@ -7,6 +7,7 @@ import { checkSolution, propagate } from './rules.ts'
 import {
   buildEdges,
   pairKeyOf,
+  stitchPerPairOf,
   type StitchesPuzzle,
   type StitchesState,
 } from './types.ts'
@@ -23,6 +24,7 @@ function search(
   maxNodes: number,
 ): { solutions: number[][]; nodes: number; timedOut: boolean } {
   const edges = buildEdges(p.regions, p.width, p.height)
+  const k = stitchPerPairOf(p)
   const vals = new Array<number>(edges.length).fill(-1)
   const candidate: number[] = []
   const pairMap = new Map<string, number[]>()
@@ -58,7 +60,8 @@ function search(
         if (vals[e] === 1) selected++
         else if (vals[e] === -1) unknown.push(e)
       }
-      if (selected === 0 && unknown.length > 0 && unknown.length < best) {
+      // 优先处理「还差缝线、且候选边最少」的区块对（K=1 时即 selected===0）
+      if (selected < k && unknown.length > 0 && unknown.length < best) {
         best = unknown.length
         target = unknown[0]!
       }

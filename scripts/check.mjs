@@ -1,5 +1,10 @@
 /**
  * 缝线题库审计
+ *
+ * 支持经典 1÷ 与 K÷（k 字段，缺省 1）变体：
+ * - 参考解必须合法；
+ * - 解唯一；
+ * - 规则传播不矛盾（记录逻辑可推满 / 需回溯）。
  */
 
 import { readFileSync } from 'node:fs'
@@ -9,6 +14,7 @@ import {
   decodeEdges,
   decodeRegions,
   edgeCount,
+  stitchPerPairOf,
 } from '../src/game/types.ts'
 import { checkSolution, propagate } from '../src/game/rules.ts'
 import { countSolutions } from '../src/game/solver.ts'
@@ -18,7 +24,7 @@ const text = readFileSync(DATA_FILE, 'utf8')
 
 const entries = []
 const re =
-  /\{\s*id:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*width:\s*(\d+),\s*height:\s*(\d+),\s*difficulty:\s*'([^']+)',\s*series:\s*"([^"]+)",\s*board:\s*"([^"]*)",\s*solution:\s*"([^"]*)"\s*\}/g
+  /\{\s*id:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*width:\s*(\d+),\s*height:\s*(\d+),\s*difficulty:\s*'([^']+)',\s*series:\s*"([^"]+)",\s*(?:k:\s*(\d+),\s*)?board:\s*"([^"]*)",\s*solution:\s*"([^"]*)"\s*\}/g
 let m
 while ((m = re.exec(text)) !== null) {
   entries.push({
@@ -28,8 +34,9 @@ while ((m = re.exec(text)) !== null) {
     height: Number(m[4]),
     difficulty: m[5],
     series: m[6],
-    board: m[7],
-    solution: m[8],
+    k: m[7] === undefined ? undefined : Number(m[7]),
+    board: m[8],
+    solution: m[9],
   })
 }
 
@@ -44,8 +51,15 @@ for (const e of entries) {
   }
   ids.add(e.id)
   const parts = e.board.split('|')
-  if (parts.length !== 3) {
+  if (parts.length !== 3 && parts.length !== 4) {
     console.error(`[check] ${e.id} board 格式非法`)
+    errors++
+    continue
+  }
+  const k =
+    e.k ?? (parts[3] !== undefined && parts[3] !== '' ? Number(parts[3]) : 1)
+  if (!Number.isInteger(k) || k < 1 || k > 9) {
+    console.error(`[check] ${e.id} 变体参数 K 非法：${k}`)
     errors++
     continue
   }
@@ -65,6 +79,7 @@ for (const e of entries) {
     width: e.width,
     height: e.height,
     difficulty: e.difficulty,
+    stitchPerPair: k,
     regions,
     rowCounts,
     colCounts,
@@ -100,7 +115,7 @@ for (const e of entries) {
   const regionCount = new Set(regions).size
   const holes = values.reduce((a, b) => a + b, 0)
   console.log(
-    `[check] ${e.id} ${e.width}×${e.height} 区块 ${regionCount} 针孔 ${holes} · 解唯一 · 逻辑${decided ? '可推满' : '需回溯'} · ${counted.nodes} 节点`,
+    `[check] ${e.id} ${e.width}×${e.height} ${stitchPerPairOf(puzzle)}÷ · 区块 ${regionCount} 针孔 ${holes} · 解唯一 · 逻辑${decided ? '可推满' : '需回溯'} · ${counted.nodes} 节点`,
   )
 }
 

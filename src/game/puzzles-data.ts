@@ -6,6 +6,8 @@ export interface RawPuzzle {
   height: number
   difficulty: 'easy' | 'medium' | 'hard' | 'custom'
   series: string
+  /** 变体参数 K：每对相邻区块恰好 K 条缝线（缺省 1，即经典 1÷） */
+  k?: number
   /** 题面编码串（格式由 src/game/puzzles.ts 解析） */
   board: string
   /** 参考解编码串（没有则留空） */

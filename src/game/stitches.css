@@ -39,6 +39,14 @@
   fill: var(--error);
 }
 
+.board-svg .st-variant {
+  fill: #7a6a52;
+  font-family: var(--mono);
+  font-weight: 700;
+  text-anchor: start;
+  pointer-events: none;
+}
+
 .board-svg .st-error {
   fill: none;
   stroke: var(--error);

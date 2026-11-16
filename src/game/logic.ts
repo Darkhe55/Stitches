@@ -32,7 +32,7 @@ export function planLogicSolve(puzzle: Puzzle, initialState: GameState): LogicPl
 
   if (
     !propagate(grid, p, (e, v) =>
-      onSet(e, v, v === 1 ? '这一对区块只能在这里缝' : '这条边不能缝'),
+      onSet(e, v, v === 1 ? '这一对区块的缝线只能放在这些边上' : '这条边不能缝'),
     )
   ) {
     return { puzzleId: p.id, frames: [], finalState: null, ruleSteps: 0, saturated: false }

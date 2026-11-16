@@ -16,6 +16,7 @@ import {
   asStitchesPuzzle,
   asStitchesState,
   buildEdges,
+  stitchPerPairOf,
   type StitchesResult,
 } from './types'
 
@@ -42,6 +43,7 @@ export function renderBoard(
   const { w: cw, h: ch } = cellSizeOf(m)
   const bad = new Set(r.badCells ?? [])
   const edges = buildEdges(p.regions ?? [], p.width, p.height)
+  const k = stitchPerPairOf(p)
   const parts: string[] = []
 
   parts.push(
@@ -81,18 +83,29 @@ export function renderBoard(
     }
   }
 
+  // 盘外数字：两位数（如 10）适当地缩小字号，避免超出留白
+  const clueFont = (value: number): number => m.cell * (value >= 10 ? 0.26 : 0.3)
   for (let x = 0; x < p.width; x++) {
     const cx = o.x + (x + 0.5) * cw
     const badCol = (r.colBad ?? []).includes(x)
+    const value = p.colCounts?.[x] ?? 0
     parts.push(
-      `<text class="st-count${badCol ? ' bad' : ''}" x="${cx.toFixed(2)}" y="${(o.y - m.cell * 0.22).toFixed(2)}" style="font-size:${(m.cell * 0.3).toFixed(2)}px">${p.colCounts?.[x] ?? 0}</text>`,
+      `<text class="st-count${badCol ? ' bad' : ''}" x="${cx.toFixed(2)}" y="${(o.y - m.cell * 0.22).toFixed(2)}" style="font-size:${clueFont(value).toFixed(2)}px">${value}</text>`,
     )
   }
   for (let y = 0; y < p.height; y++) {
     const cy = o.y + (y + 0.5) * ch
     const badRow = (r.rowBad ?? []).includes(y)
+    const value = p.rowCounts?.[y] ?? 0
     parts.push(
-      `<text class="st-count${badRow ? ' bad' : ''}" x="${(o.x - m.cell * 0.24).toFixed(2)}" y="${(cy + 2).toFixed(2)}" style="font-size:${(m.cell * 0.3).toFixed(2)}px">${p.rowCounts?.[y] ?? 0}</text>`,
+      `<text class="st-count${badRow ? ' bad' : ''}" x="${(o.x - m.cell * 0.24).toFixed(2)}" y="${(cy + 2).toFixed(2)}" style="font-size:${clueFont(value).toFixed(2)}px">${value}</text>`,
+    )
+  }
+
+  // K÷ 变体徽标（K>1 时才画，1÷ 经典题面保持原样）
+  if (k > 1) {
+    parts.push(
+      `<text class="st-variant" x="${o.x.toFixed(2)}" y="${(o.y + ch * p.height + m.cell * 0.22).toFixed(2)}" style="font-size:${(m.cell * 0.19).toFixed(2)}px">${k}÷ · 每对相邻区域 ${k} 条线</text>`,
     )
   }
 

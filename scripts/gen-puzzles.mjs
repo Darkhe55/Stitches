@@ -56,6 +56,8 @@ lines.push('  width: number')
 lines.push('  height: number')
 lines.push(`  difficulty: 'easy' | 'medium' | 'hard' | 'custom'`)
 lines.push('  series: string')
+lines.push('  /** 变体参数 K：每对相邻区块恰好 K 条缝线（缺省 1，即经典 1÷） */')
+lines.push('  k?: number')
 lines.push('  /** 题面编码串（格式由 src/game/puzzles.ts 解析） */')
 lines.push('  board: string')
 lines.push('  /** 参考解编码串（没有则留空） */')
@@ -64,8 +66,9 @@ lines.push('}')
 lines.push('')
 lines.push('export const RAW_PUZZLES: RawPuzzle[] = [')
 for (const p of items) {
+  const kField = Number.isInteger(p.k) && p.k > 0 && p.k !== 1 ? `k: ${p.k}, ` : ''
   lines.push(
-    `  { id: ${JSON.stringify(p.id)}, name: ${JSON.stringify(p.name)}, width: ${p.width}, height: ${p.height}, difficulty: '${p.difficulty}', series: ${JSON.stringify(p.series || 'builtin')}, board: ${JSON.stringify(p.board)}, solution: ${JSON.stringify(p.solution || '')} },`,
+    `  { id: ${JSON.stringify(p.id)}, name: ${JSON.stringify(p.name)}, width: ${p.width}, height: ${p.height}, difficulty: '${p.difficulty}', series: ${JSON.stringify(p.series || 'builtin')}, ${kField}board: ${JSON.stringify(p.board)}, solution: ${JSON.stringify(p.solution || '')} },`,
   )
 }
 lines.push(']')

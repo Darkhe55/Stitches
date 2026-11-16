@@ -6,6 +6,7 @@ import {
   buildEdges,
   incidentEdges,
   pairKeyOf,
+  stitchPerPairOf,
   type StitchesEdge,
   type StitchesPuzzle,
 } from './types.ts'
@@ -19,6 +20,8 @@ interface Prepared {
   rows: Array<Array<{ e: number; w: number }>>
   cols: Array<Array<{ e: number; w: number }>>
   candidate: number[]
+  /** 变体参数：每对相邻区块需要的缝线数 K */
+  stitchPerPair: number
 }
 
 const cache = new WeakMap<StitchesPuzzle, Prepared>()
@@ -58,7 +61,15 @@ function prepare(p: StitchesPuzzle): Prepared {
       cols[ax]!.push({ e, w: 2 })
     }
   }
-  const out = { edges, incident, pairs, rows, cols, candidate }
+  const out = {
+    edges,
+    incident,
+    pairs,
+    rows,
+    cols,
+    candidate,
+    stitchPerPair: stitchPerPairOf(p),
+  }
   cache.set(p, out)
   return out
 }
@@ -68,7 +79,7 @@ export function propagate(
   p: StitchesPuzzle,
   onSet?: SetCallback,
 ): boolean {
-  const { edges, incident, pairs, rows, cols, candidate } = prepare(p)
+  const { edges, incident, pairs, rows, cols, candidate, stitchPerPair: k } = prepare(p)
   let changed = true
   const set = (e: number, value: number): boolean => {
     if (values[e] === value) return true
@@ -101,6 +112,7 @@ export function propagate(
       if (selected === 1) for (const e of unknown) if (!set(e, 0)) return false
     }
 
+    // 每对相邻区块恰好 K 条缝线（K=1 即经典 1÷；K=3 为 3÷ 变体）
     for (const [, list] of pairs) {
       let selected = 0
       let unknown = 0
@@ -108,13 +120,13 @@ export function propagate(
         if (values[e] === 1) selected++
         else if (values[e] === -1) unknown++
       }
-      if (selected > 1) return false
-      if (selected === 1) {
+      if (selected > k) return false
+      if (selected === k) {
         for (const e of list) if (values[e] === -1 && !set(e, 0)) return false
-      } else if (unknown === 0) {
+      } else if (selected + unknown < k) {
         return false
-      } else if (unknown === 1 && !set(list.find((e) => values[e] === -1)!, 1)) {
-        return false
+      } else if (selected + unknown === k) {
+        for (const e of list) if (values[e] === -1 && !set(e, 1)) return false
       }
     }
 
@@ -169,13 +181,15 @@ export interface StitchesCheck {
   colBad: number[]
   pairMissing: string[]
   pairDuplicated: string[]
+  /** 本题的变体参数 K */
+  stitchPerPair: number
 }
 
 export function checkSolution(
   values: ArrayLike<number>,
   p: StitchesPuzzle,
 ): StitchesCheck {
-  const { edges, incident, pairs } = prepare(p)
+  const { edges, incident, pairs, stitchPerPair: k } = prepare(p)
   const bad = new Set<number>()
   const rowActual = new Array<number>(p.height).fill(0)
   const colActual = new Array<number>(p.width).fill(0)
@@ -218,8 +232,8 @@ export function checkSolution(
   for (const [key, list] of pairs) {
     let count = 0
     for (const e of list) if (values[e] === 1) count++
-    if (count === 0) pairMissing.push(key)
-    else if (count > 1) {
+    if (count < k) pairMissing.push(key)
+    else if (count > k) {
       pairDuplicated.push(key)
       for (const e of list) {
         if (values[e] === 1) {
@@ -247,6 +261,7 @@ export function checkSolution(
     colBad,
     pairMissing,
     pairDuplicated,
+    stitchPerPair: k,
     ok:
       bad.size === 0 &&
       rowBad.length === 0 &&
