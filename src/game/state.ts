@@ -37,8 +37,9 @@ export function cycleValue(state: GameState, target: HitTarget): number {
   return (s.edges[target.index] ?? 0) ? 0 : 1
 }
 
-export function rightClickValue(): number {
-  return 0
+export function rightClickValue(state: GameState, target: HitTarget): number {
+  const s = asStitchesState(state)
+  return (s.edges[target.index] ?? 0) ? 0 : 1
 }
 
 export function applyMove(state: GameState, move: Move): void {
